@@ -1,0 +1,63 @@
+{
+    "name": "simple-dex-frontend",
+    "version": "0.1.0",
+    "private": true,
+    "dependencies": {
+        "@openzeppelin/contracts": "^4.9.3",
+        "@testing-library/jest-dom": "^5.17.0",
+        "@testing-library/react": "^13.4.0",
+        "@testing-library/user-event": "^13.5.0",
+        "@types/jest": "^27.5.2",
+        "@types/node": "^16.18.65",
+        "@types/react": "^18.2.39",
+        "@types/react-dom": "^18.2.17",
+        "ethers": "^5.7.2",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-scripts": "^3.0.1",
+        "typescript": "^4.9.5",
+        "web-vitals": "^2.1.4",
+        "web3modal": "^1.9.12"
+    },
+    "scripts": {
+        "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
+        "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
+        "test": "NODE_OPTIONS=--openssl-legacy-provider react-scripts test",
+        "eject": "react-scripts eject",
+        "compile": "npx hardhat compile",
+        "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+        "deploy:testnet": "npx hardhat run scripts/deploy.js --network goerli",
+        "node": "npx hardhat node"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app",
+            "react-app/jest"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "postcss": {
+        "plugins": {
+          "tailwindcss": {},
+          "autoprefixer": {}
+        }
+    },
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^2.0.2",
+        "autoprefixer": "^10.4.16",
+        "hardhat": "^2.18.0",
+        "postcss": "^8.4.31",
+        "tailwindcss": "^3.3.5"
+    }
+}
