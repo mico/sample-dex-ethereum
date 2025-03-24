@@ -257,7 +257,7 @@ export function useDEX(dexAddress: string) {
       const amountBDesired = utils.parseUnits(amountB, state.tokenB.decimals);
       
       // Calculate minimum amounts based on slippage
-      const slippageFactor = 100 - slippagePercent;
+      const slippageFactor = 100 - (slippagePercent * 10);
       const amountAMin = amountADesired.mul(slippageFactor).div(100);
       const amountBMin = amountBDesired.mul(slippageFactor).div(100);
       
@@ -299,7 +299,7 @@ export function useDEX(dexAddress: string) {
       const expectedB = reserveB.mul(parsedLiquidity).div(totalLiquidity);
       
       // Calculate minimum amounts based on slippage
-      const slippageFactor = 100 - slippagePercent;
+      const slippageFactor = 100 - (slippagePercent * 10);
       const amountAMin = expectedA.mul(slippageFactor).div(100);
       const amountBMin = expectedB.mul(slippageFactor).div(100);
       
@@ -338,7 +338,7 @@ export function useDEX(dexAddress: string) {
         : await dexContract.getQuoteBToA(parsedAmountIn);
       
       // Calculate minimum output with slippage
-      const slippageFactor = 100 - slippagePercent;
+      const slippageFactor = 100 - (slippagePercent * 10);
       const amountOutMin = quote.mul(slippageFactor).div(100);
       
       // Approve input token
