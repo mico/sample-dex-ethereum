@@ -22,6 +22,9 @@ task("transfer-weth", "Transfers WETH and test tokens to a wallet")
     // Connect to tokens
     const WETH = await hre.ethers.getContractAt("WETH9", addresses.weth, deployer);
     const TestToken = await hre.ethers.getContractAt("TestToken", addresses.tokenB, deployer);
+
+    console.log("WETH address:", addresses.weth);
+    console.log("TestToken address:", addresses.tokenB);
     
     // Parse amount
     const parseEther = hre.ethers.utils?.parseEther || hre.ethers.parseEther;
@@ -31,7 +34,9 @@ task("transfer-weth", "Transfers WETH and test tokens to a wallet")
     console.log(`Minting ${taskArgs.amount} Test Tokens...`);
     try {
       let tx = await TestToken.mint(taskArgs.address, amountWei);
-      await tx.wait();
+      console.log(`Transaction hash: ${tx.hash}`);
+      const txReciept = await tx.wait();
+      console.log("txReciept: " + txReciept);
       console.log("Test Token minting successful");
     } catch (error) {
       console.error("Error minting Test Token:", error.message);
@@ -43,15 +48,15 @@ task("transfer-weth", "Transfers WETH and test tokens to a wallet")
       let tx = await WETH.deposit({ value: amountWei });
       await tx.wait();
       console.log("ETH deposit successful");
-      
+
       console.log(`Transferring ${taskArgs.amount} WETH to ${taskArgs.address}...`);
       tx = await WETH.transfer(taskArgs.address, amountWei);
+      console.log(`Transaction hash: ${tx.hash}`);
       await tx.wait();
       console.log("WETH transfer successful");
     } catch (error) {
       console.error("Error with WETH operations:", error.message);
     }
-    
     // Get updated balances
     try {
       const formatEther = hre.ethers.utils?.formatEther || hre.ethers.formatEther;

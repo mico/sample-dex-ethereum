@@ -1,4 +1,4 @@
-import React from 'react';
+import './AppKitProvider';
 import SimpleDEXUI from './react-dex-ui';
 
 function App() {

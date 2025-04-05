@@ -8,10 +8,7 @@ task("send-eth", "Sending ETH to a wallet")
     console.log(`Transferring ${taskArgs.amount} tokens to ${taskArgs.address}...`);
     // XXX: to update
     const [sender] = await hre.ethers.getSigners();
-  
-    // The wallet to send ETH to
-    const recipient = "0x9d2c8D3e68A3d91cAF17F3eD476A793Ef57f49af"; // YOUR WALLET ADDRESS
-    
+      
     // Amount to send (10 ETH)
     const amount = hre.ethers.parseEther(taskArgs.amount);
     

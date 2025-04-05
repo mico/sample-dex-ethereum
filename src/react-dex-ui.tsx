@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDEX } from './dexHook'; // Import the hook we created earlier
 
 // DEX_ADDRESS should come from environment variable in a real app
-const DEX_ADDRESS = process.env.REACT_APP_DEX_ADDRESS || '0x123...'; // Replace with your deployed contract address
+const DEX_ADDRESS = import.meta.env.VITE_DEX_ADDRESS || '0x123...'; // Replace with your deployed contract address
 
 const SimpleDEXUI = () => {
   // Initialize the DEX hook
@@ -106,7 +106,7 @@ const SimpleDEXUI = () => {
                 Connected
               </span>
               <span className="text-xs text-gray-500 mt-1">
-                {dex.userAddress.substring(0, 6)}...{dex.userAddress.substring(38)}
+                {dex.userAddress?.substring(0, 6)}...{dex.userAddress?.substring(38)}
               </span>
             </div>
           )}

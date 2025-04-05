@@ -2,8 +2,8 @@
 
 import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
-import { Contract, BigNumber, utils } from 'ethers';
-import Web3Modal from 'web3modal';
+import { Contract } from 'ethers';
+import { useAppKitAccount, useDisconnect, useAppKit } from "@reown/appkit/react";
 
 // Type definitions
 type Token = {
@@ -16,12 +16,12 @@ type Token = {
 type DEXState = {
   tokenA: Token | null;
   tokenB: Token | null;
-  reserveA: BigNumber;
-  reserveB: BigNumber;
-  userBalanceA: BigNumber;
-  userBalanceB: BigNumber;
-  userLiquidity: BigNumber;
-  totalLiquidity: BigNumber;
+  reserveA: bigint;
+  reserveB: bigint;
+  userBalanceA: bigint;
+  userBalanceB: bigint;
+  userLiquidity: bigint;
+  totalLiquidity: bigint;
 };
 
 // DEX ABI - just the functions we need
@@ -55,53 +55,77 @@ const ERC20_ABI = [
  * Custom hook for interacting with the DEX
  */
 export function useDEX(dexAddress: string) {
-  // Using underscore prefix to indicate intentionally unused variable
-  const [_provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
-  const [signer, setSigner] = useState<ethers.Signer | null>(null);
-  const [userAddress, setUserAddress] = useState<string>('');
+  // Web3Modal hooks
+  // const { connect, isConnecting } = useReownConnect(); // Use ReownAppKit connect hook
+  const { address, isConnected, status } = useAppKitAccount();
+  const { disconnect } = useDisconnect();
+  const { open: openWalletModal } = useAppKit(); // Get the open function
+  const [_signer, setSigner] = useState<ethers.Signer | null>(null);
+
+
+  // Provider and contract state
+  const [_provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  // const [signer, setSigner] = useState<ethers.Signer | null>(null);
   const [dexContract, setDexContract] = useState<Contract | null>(null);
+  
+  // DEX state
   const [state, setState] = useState<DEXState>({
     tokenA: null,
     tokenB: null,
-    reserveA: BigNumber.from(0),
-    reserveB: BigNumber.from(0),
-    userBalanceA: BigNumber.from(0),
-    userBalanceB: BigNumber.from(0),
-    userLiquidity: BigNumber.from(0),
-    totalLiquidity: BigNumber.from(0),
+    reserveA: BigInt(0),
+    reserveB: BigInt(0),
+    userBalanceA: BigInt(0),
+    userBalanceB: BigInt(0),
+    userLiquidity: BigInt(0),
+    totalLiquidity: BigInt(0),
   });
   
-  // Connect to wallet and initialize contracts
-  const connect = async () => {
+  // Connect to wallet
+  const connectWallet = async () => {
     try {
-      const web3Modal = new Web3Modal({
-        cacheProvider: true,
-        providerOptions: {}, // Add providers like WalletConnect here
-      });
-      
-      const connection = await web3Modal.connect();
-      const ethersProvider = new ethers.providers.Web3Provider(connection);
-      const ethersSigner = ethersProvider.getSigner();
-      const address = await ethersSigner.getAddress();
-      
-      setProvider(ethersProvider);
-      setSigner(ethersSigner);
-      setUserAddress(address);
-      
-      // Create DEX contract instance
-      const dex = new ethers.Contract(dexAddress, DEX_ABI, ethersSigner);
-      setDexContract(dex);
-      
-      // Initialize token contracts and state
-      await refreshDexState(dex, address);
-      
-      // Setup event listeners for wallet changes
-      connection.on('accountsChanged', () => window.location.reload());
-      connection.on('chainChanged', () => window.location.reload());
+      // await connect(); // Use ReownAppKit connect method
+      await openWalletModal({ view: 'Connect' });
+
     } catch (error) {
       console.error('Connection error:', error);
     }
   };
+
+  const isConnecting = status === 'connecting';
+
+  // Initialize provider, signer, and contracts when connected
+  useEffect(() => {
+    const initializeConnection = async () => {
+      if (isConnected && address && (window as any).ethereum) {
+        try {
+          // Create provider and signer from window.ethereum
+          const ethersProvider = new ethers.BrowserProvider((window as any).ethereum);
+          
+          const ethersSigner = await ethersProvider.getSigner();
+          
+          // Set state
+          setProvider(ethersProvider);
+          setSigner(ethersSigner);
+          
+          // Create DEX contract instance
+          const dex = new ethers.Contract(dexAddress, DEX_ABI, ethersSigner);
+          setDexContract(dex);
+          
+          // Initialize token contracts and state
+          await refreshDexState(dex, address);
+        } catch (error) {
+          console.error('Error initializing connection:', error);
+        }
+      } else {
+        // Reset state when disconnected
+        setProvider(null);
+        setSigner(null);
+        setDexContract(null);
+      }
+    };
+
+    initializeConnection();
+  }, [isConnected, address, dexAddress]);
   
   // Initialize token contracts and get state data
   const refreshDexState = async (dexContract: Contract, address: string) => {
@@ -109,10 +133,12 @@ export function useDEX(dexAddress: string) {
       // Get token addresses
       const tokenAAddress = await dexContract.tokenA();
       const tokenBAddress = await dexContract.tokenB();
+      console.log("tokenAAddress", tokenAAddress);
+      console.log("tokenBAddress", tokenBAddress);
       
       // Create token contracts - use the same provider/signer as the dexContract
-      const tokenAContract = new ethers.Contract(tokenAAddress, ERC20_ABI, dexContract.signer || dexContract.provider);
-      const tokenBContract = new ethers.Contract(tokenBAddress, ERC20_ABI, dexContract.signer || dexContract.provider);
+      const tokenAContract = new ethers.Contract(tokenAAddress, ERC20_ABI, dexContract.runner);
+      const tokenBContract = new ethers.Contract(tokenBAddress, ERC20_ABI, dexContract.runner);
       
       // Get token info
       const tokenASymbol = await tokenAContract.symbol();
@@ -169,37 +195,40 @@ export function useDEX(dexAddress: string) {
     }
   };
   
+  // Other functions remain the same...
   // Refresh balances and reserves
   const refreshBalances = async () => {
-    if (!dexContract || !signer || !state.tokenA || !state.tokenB) return;
+    if (!dexContract || !address || !state.tokenA || !state.tokenB) return;
     
-    const address = await signer.getAddress();
-    
-    const [
-      reserveA,
-      reserveB,
-      userBalanceA,
-      userBalanceB,
-      userLiquidity,
-      totalLiquidity,
-    ] = await Promise.all([
-      dexContract.reserveA(),
-      dexContract.reserveB(),
-      state.tokenA.contract.balanceOf(address),
-      state.tokenB.contract.balanceOf(address),
-      dexContract.liquidity(address),
-      dexContract.totalLiquidity(),
-    ]);
-    
-    setState(prev => ({
-      ...prev,
-      reserveA,
-      reserveB,
-      userBalanceA,
-      userBalanceB,
-      userLiquidity,
-      totalLiquidity,
-    }));
+    try {
+      const [
+        reserveA,
+        reserveB,
+        userBalanceA,
+        userBalanceB,
+        userLiquidity,
+        totalLiquidity,
+      ] = await Promise.all([
+        dexContract.reserveA(),
+        dexContract.reserveB(),
+        state.tokenA.contract.balanceOf(address),
+        state.tokenB.contract.balanceOf(address),
+        dexContract.liquidity(address),
+        dexContract.totalLiquidity(),
+      ]);
+      
+      setState(prev => ({
+        ...prev,
+        reserveA,
+        reserveB,
+        userBalanceA,
+        userBalanceB,
+        userLiquidity,
+        totalLiquidity,
+      }));
+    } catch (error) {
+      console.error('Error refreshing balances:', error);
+    }
   };
   
   // Get swap quote
@@ -211,14 +240,14 @@ export function useDEX(dexAddress: string) {
     
     try {
       const token = isAToB ? state.tokenA : state.tokenB;
-      const parsedAmount = utils.parseUnits(amountIn, token.decimals);
+      const parsedAmount = ethers.parseUnits(amountIn, token.decimals);
       
       const quote = isAToB
         ? await dexContract.getQuoteAToB(parsedAmount)
         : await dexContract.getQuoteBToA(parsedAmount);
       
       const outputToken = isAToB ? state.tokenB : state.tokenA;
-      return utils.formatUnits(quote, outputToken.decimals);
+      return ethers.formatUnits(quote, outputToken.decimals);
     } catch (error) {
       console.error('Error getting quote:', error);
       return '0';
@@ -233,8 +262,8 @@ export function useDEX(dexAddress: string) {
     if (!dexContract) return false;
     
     try {
-      const parsedAmount = utils.parseUnits(amount, token.decimals);
-      const tx = await token.contract.approve(dexContract.address, parsedAmount);
+      const parsedAmount = ethers.parseUnits(amount, token.decimals);
+      const tx = await token.contract.approve(dexContract.target, parsedAmount);
       await tx.wait();
       return true;
     } catch (error) {
@@ -253,13 +282,13 @@ export function useDEX(dexAddress: string) {
     
     try {
       // Parse amounts
-      const amountADesired = utils.parseUnits(amountA, state.tokenA.decimals);
-      const amountBDesired = utils.parseUnits(amountB, state.tokenB.decimals);
+      const amountADesired = ethers.parseUnits(amountA, state.tokenA.decimals);
+      const amountBDesired = ethers.parseUnits(amountB, state.tokenB.decimals);
       
       // Calculate minimum amounts based on slippage
-      const slippageFactor = 100 - (slippagePercent * 10);
-      const amountAMin = amountADesired.mul(slippageFactor).div(100);
-      const amountBMin = amountBDesired.mul(slippageFactor).div(100);
+      const slippageFactor = BigInt(100) - BigInt(slippagePercent * 10);
+      const amountAMin = (amountADesired * slippageFactor) / BigInt(100);
+      const amountBMin = (amountBDesired * slippageFactor) / BigInt(100);
       
       // Approve tokens
       await approveToken(state.tokenA, amountA);
@@ -292,16 +321,16 @@ export function useDEX(dexAddress: string) {
     
     try {
       const { reserveA, reserveB, totalLiquidity } = state;
-      const parsedLiquidity = utils.parseEther(liquidityAmount);
+      const parsedLiquidity = ethers.parseEther(liquidityAmount);
       
       // Calculate expected amounts
-      const expectedA = reserveA.mul(parsedLiquidity).div(totalLiquidity);
-      const expectedB = reserveB.mul(parsedLiquidity).div(totalLiquidity);
+      const expectedA = (reserveA * parsedLiquidity) / totalLiquidity;
+      const expectedB = (reserveB * parsedLiquidity) / totalLiquidity;
       
       // Calculate minimum amounts based on slippage
-      const slippageFactor = 100 - (slippagePercent * 10);
-      const amountAMin = expectedA.mul(slippageFactor).div(100);
-      const amountBMin = expectedB.mul(slippageFactor).div(100);
+      const slippageFactor = BigInt(100) - BigInt(slippagePercent * 10);
+      const amountAMin = (expectedA * slippageFactor) / BigInt(100);
+      const amountBMin = (expectedB * slippageFactor) / BigInt(100);
       
       // Remove liquidity
       const tx = await dexContract.removeLiquidity(
@@ -330,7 +359,7 @@ export function useDEX(dexAddress: string) {
     
     try {
       const tokenIn = isAToB ? state.tokenA : state.tokenB;
-      const parsedAmountIn = utils.parseUnits(amountIn, tokenIn.decimals);
+      const parsedAmountIn = ethers.parseUnits(amountIn, tokenIn.decimals);
       
       // Get expected output
       const quote = isAToB
@@ -338,8 +367,8 @@ export function useDEX(dexAddress: string) {
         : await dexContract.getQuoteBToA(parsedAmountIn);
       
       // Calculate minimum output with slippage
-      const slippageFactor = 100 - (slippagePercent * 10);
-      const amountOutMin = quote.mul(slippageFactor).div(100);
+      const slippageFactor = BigInt(100) - BigInt(slippagePercent * 10);
+      const amountOutMin = (quote * slippageFactor) / BigInt(100);
       
       // Approve input token
       await approveToken(tokenIn, amountIn);
@@ -360,25 +389,19 @@ export function useDEX(dexAddress: string) {
   };
   
   // Format token amount for display
-  const formatTokenAmount = (token: Token | null, amount: BigNumber): string => {
+  const formatTokenAmount = (token: Token | null, amount: bigint): string => {
     if (!token) return '0';
-    return utils.formatUnits(amount, token.decimals);
+    return ethers.formatUnits(amount, token.decimals);
   };
-  
-  // Initialize on first load
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      connect();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   // Return the hook's interface
   return {
     // Connection state
-    isConnected: !!signer,
-    userAddress,
-    connect,
+    isConnected,
+    isConnecting,
+    userAddress: address,
+    connect: connectWallet,
+    disconnect,
     
     // DEX state
     state,
@@ -391,7 +414,7 @@ export function useDEX(dexAddress: string) {
       balanceB: state.tokenB ? formatTokenAmount(state.tokenB, state.userBalanceB) : '0',
       tokenASymbol: state.tokenA?.symbol || 'TokenA',
       tokenBSymbol: state.tokenB?.symbol || 'TokenB',
-      userLiquidity: utils.formatEther(state.userLiquidity),
+      userLiquidity: ethers.formatEther(state.userLiquidity),
     },
     
     // Actions
